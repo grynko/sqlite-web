@@ -29,7 +29,7 @@ else:
 try:
     from flask import (
         Flask, abort, escape, flash, jsonify, make_response, Markup, redirect,
-        render_template, request, session, url_for)
+        render_template, request, session, url_for, Blueprint)
 except ImportError:
     raise RuntimeError('Unable to import flask module. Install by running '
                        'pip install flask')
@@ -77,6 +77,8 @@ app = Flask(
     static_folder=os.path.join(CUR_DIR, 'static'),
     template_folder=os.path.join(CUR_DIR, 'templates'))
 app.config.from_object(__name__)
+
+blueprint = Blueprint('blueprint', __name__)
 dataset = None
 migrator = None
 
@@ -173,7 +175,7 @@ class SqliteDataSet(DataSet):
 # Flask views.
 #
 
-@app.route('/')
+@blueprint.route('/')
 def index():
     return render_template('index.html')
 
@@ -185,17 +187,17 @@ def require_table(fn):
         return fn(table, *args, **kwargs)
     return inner
 
-@app.route('/create-table/', methods=['POST'])
+@blueprint.route('/create-table/', methods=['POST'])
 def table_create():
     table = (request.form.get('table_name') or '').strip()
     if not table:
         flash('Table name is required.', 'danger')
-        return redirect(request.form.get('redirect') or url_for('index'))
+        return redirect(request.form.get('redirect') or url_for('.index'))
 
     dataset[table]
-    return redirect(url_for('table_import', table=table))
+    return redirect(url_for('.table_import', table=table))
 
-@app.route('/<table>/')
+@blueprint.route('/<table>/')
 @require_table
 def table_structure(table):
     ds_table = dataset[table]
@@ -221,7 +223,7 @@ def get_request_data():
         return request.form
     return request.args
 
-@app.route('/<table>/add-column/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/add-column/', methods=['GET', 'POST'])
 @require_table
 def add_column(table):
     column_mapping = OrderedDict((
@@ -248,7 +250,7 @@ def add_column(table):
                     name,
                     column_mapping[col_type](null=True)))
             flash('Column "%s" was added successfully!' % name, 'success')
-            return redirect(url_for('table_structure', table=table))
+            return redirect(url_for('.table_structure', table=table))
         else:
             flash('Name and column type are required.', 'danger')
 
@@ -259,7 +261,7 @@ def add_column(table):
         name=name,
         table=table)
 
-@app.route('/<table>/drop-column/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/drop-column/', methods=['GET', 'POST'])
 @require_table
 def drop_column(table):
     request_data = get_request_data()
@@ -271,7 +273,7 @@ def drop_column(table):
         if name in column_names:
             migrate(migrator.drop_column(table, name))
             flash('Column "%s" was dropped successfully!' % name, 'success')
-            return redirect(url_for('table_structure', table=table))
+            return redirect(url_for('.table_structure', table=table))
         else:
             flash('Name is required.', 'danger')
 
@@ -282,7 +284,7 @@ def drop_column(table):
         name=name,
         table=table)
 
-@app.route('/<table>/rename-column/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/rename-column/', methods=['GET', 'POST'])
 @require_table
 def rename_column(table):
     request_data = get_request_data()
@@ -296,7 +298,7 @@ def rename_column(table):
         if (rename in column_names) and (rename_to not in column_names):
             migrate(migrator.rename_column(table, rename, rename_to))
             flash('Column "%s" was renamed successfully!' % rename, 'success')
-            return redirect(url_for('table_structure', table=table))
+            return redirect(url_for('.table_structure', table=table))
         else:
             flash('Column name is required and cannot conflict with an '
                   'existing column\'s name.', 'danger')
@@ -309,7 +311,7 @@ def rename_column(table):
         rename_to=rename_to,
         table=table)
 
-@app.route('/<table>/add-index/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/add-index/', methods=['GET', 'POST'])
 @require_table
 def add_index(table):
     request_data = get_request_data()
@@ -326,7 +328,7 @@ def add_index(table):
                     indexed_columns,
                     unique))
             flash('Index created successfully.', 'success')
-            return redirect(url_for('table_structure', table=table))
+            return redirect(url_for('.table_structure', table=table))
         else:
             flash('One or more columns must be selected.', 'danger')
 
@@ -337,7 +339,7 @@ def add_index(table):
         table=table,
         unique=unique)
 
-@app.route('/<table>/drop-index/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/drop-index/', methods=['GET', 'POST'])
 @require_table
 def drop_index(table):
     request_data = get_request_data()
@@ -349,7 +351,7 @@ def drop_index(table):
         if name in index_names:
             migrate(migrator.drop_index(table, name))
             flash('Index "%s" was dropped successfully!' % name, 'success')
-            return redirect(url_for('table_structure', table=table))
+            return redirect(url_for('.table_structure', table=table))
         else:
             flash('Index name is required.', 'danger')
 
@@ -360,7 +362,7 @@ def drop_index(table):
         name=name,
         table=table)
 
-@app.route('/<table>/drop-trigger/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/drop-trigger/', methods=['GET', 'POST'])
 @require_table
 def drop_trigger(table):
     request_data = get_request_data()
@@ -372,7 +374,7 @@ def drop_trigger(table):
         if name in trigger_names:
             dataset.query('DROP TRIGGER "%s";' % name)
             flash('Trigger "%s" was dropped successfully!' % name, 'success')
-            return redirect(url_for('table_structure', table=table))
+            return redirect(url_for('.table_structure', table=table))
         else:
             flash('Trigger name is required.', 'danger')
 
@@ -383,7 +385,7 @@ def drop_trigger(table):
         name=name,
         table=table)
 
-@app.route('/<table>/content/')
+@blueprint.route('/<table>/content/')
 @require_table
 def table_content(table):
     page_number = request.args.get('page') or ''
@@ -438,7 +440,7 @@ def table_content(table):
         total_pages=total_pages,
         total_rows=total_rows)
 
-@app.route('/<table>/query/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/query/', methods=['GET', 'POST'])
 @require_table
 def table_query(table):
     data = []
@@ -480,7 +482,7 @@ def table_query(table):
         table=table,
         table_sql=table_sql)
 
-@app.route('/table-definition/', methods=['POST'])
+@blueprint.route('/table-definition/', methods=['POST'])
 def set_table_definition_preference():
     key = 'show'
     show = False
@@ -515,7 +517,7 @@ def export(table, sql, export_format):
     response.headers['Pragma'] = 'public'
     return response
 
-@app.route('/<table>/import/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/import/', methods=['GET', 'POST'])
 @require_table
 def table_import(table):
     count = None
@@ -548,7 +550,7 @@ def table_import(table):
                     'Successfully imported %s objects from %s.' % (
                         count, file_obj.filename),
                     'success')
-                return redirect(url_for('table_content', table=table))
+                return redirect(url_for('.table_content', table=table))
 
     return render_template(
         'table_import.html',
@@ -556,14 +558,14 @@ def table_import(table):
         strict=strict,
         table=table)
 
-@app.route('/<table>/drop/', methods=['GET', 'POST'])
+@blueprint.route('/<table>/drop/', methods=['GET', 'POST'])
 @require_table
 def drop_table(table):
     if request.method == 'POST':
         model_class = dataset[table].model_class
         model_class.drop_table()
         flash('Table "%s" dropped successfully.' % table, 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('.index'))
 
     return render_template('drop_table.html', table=table)
 
@@ -659,6 +661,11 @@ def get_option_parser():
         default='127.0.0.1',
         help='Host for web interface, default=127.0.0.1')
     parser.add_option(
+        '-P',
+        '--prefix',
+        default='/',
+        help='URL prefix for web interface, default=/')
+    parser.add_option(
         '-d',
         '--debug',
         action='store_true',
@@ -677,8 +684,8 @@ def die(msg, exit_code=1):
     sys.stderr.flush()
     sys.exit(exit_code)
 
-def open_browser_tab(host, port):
-    url = 'http://%s:%s/' % (host, port)
+def open_browser_tab(host, port, prefix):
+    url = 'http://%s:%s%s' % (host, port, prefix)
 
     def _open_tab(url):
         time.sleep(1.5)
@@ -706,7 +713,8 @@ def main():
     migrator = dataset._migrator
     dataset.close()
     if options.browser:
-        open_browser_tab(options.host, options.port)
+        open_browser_tab(options.host, options.port, options.prefix)
+    app.register_blueprint(blueprint, url_prefix=options.prefix)
     app.run(host=options.host, port=options.port, debug=options.debug)
 
 

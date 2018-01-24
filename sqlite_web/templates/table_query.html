@@ -27,7 +27,7 @@
         var show = !tableInfo.is(':visible');
         e.preventDefault();
         tableInfo.toggle('slide');
-        $.post('{{ url_for('set_table_definition_preference') }}', {'show': show}, function(resp) {
+        $.post('{{ url_for('.set_table_definition_preference') }}', {'show': show}, function(resp) {
           console.log('preference logged, new value: ' + resp.show);
         });
       });
@@ -77,7 +77,7 @@
     {% if not data %}
       <p>Empty result set.</p>
     {% else %}
-      <a class="pull-right" href="{{ url_for('table_query', table=table, sql=sql) }}">Permalink</a>
+      <a class="pull-right" href="{{ url_for('.table_query', table=table, sql=sql) }}">Permalink</a>
       <h3>
         Results ({{ data|length }})
       </h3>

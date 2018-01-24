@@ -7,7 +7,7 @@
     {% for table_name in dataset.tables|sort %}
       {% if table_name not in virtual_tables_corollary %}
       <li class="table-link{% if table and table_name == table %} active{% endif %}">
-        <a href="{{ url_for('table_structure', table=table_name) }}">
+        <a href="{{ url_for('.table_structure', table=table_name) }}">
           {{ table_name }}
           {% if table_name in virtual_tables %}
             <sup>(v)</sup>
@@ -22,7 +22,7 @@
   <ul class="nav nav-pills nav-stacked" id="helper-tables" role="tablist"{% if table not in virtual_tables_corollary %} style="display:none;"{% endif %}>
     {% for table_name in virtual_tables_corollary|sort %}
       <li{% if table and table_name == table %} class="active"{% endif %}>
-        <a href="{{ url_for('table_structure', table=table_name) }}">
+        <a href="{{ url_for('.table_structure', table=table_name) }}">
           <small>{{ table_name }}</small>
         </a>
       </li>
